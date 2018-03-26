@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Doodle Jump</title>
+    <style>
+        canvas {
+            width: 100%;
+            height: 100%
+        }
+        body {
+            color: white;
+            font-family:Monospace;
+            font-size:13px;
+            text-align:center;
+            background-color: #fff;
+            margin: 0px;
+            overflow: hidden;
+        }
+        #info {
+            position: absolute;
+            top: 0px; width: 100%;
+            padding: 5px;
+        }
+        a {
+            color: #0af;
+        }
+    </style>
+    <script src="https://threejs.org/build/three.min.js"></script>
+    <script src="dat.gui.js"></script>
+</head>
+<body>
+
+    <div id="info">
+    <a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> doodle jump - made by marcus orciuch - sprites by ...
+    <br><br>a - left | d - right | space/w - shoot | accelerometer and tap for mobile
+    <br><br> <span id="score">0</span></div>
+
+    <script>
+        // Instantiates several variables for use in rendering
+        var camera, scene, renderer;
+        var geometry, material, mesh;
+        var platformList = [];
+
+        // Game variables
+        var highestY = 0;
+
+        // Needed to count delta time and time elapsed
+        clock = new THREE.Clock();
+
+        // Creates player data representation object
+        var player = {
+            left: false,
+            right: false,
+            xvelo: 0,
+            yvelo: 0
+        };
+
+        // Creates scene root ready for adding objects
+        scene = new THREE.Scene();
+        scene.fog = new THREE.Fog( 0x000000, 1500, 2100 );
+        var group = new THREE.Group();
+
+        // Creates first bottom platform so the user does fall initially
+        geometry = new THREE.BoxGeometry(3.5, 0.05, 0.1);
+        material = new THREE.MeshNormalMaterial();
+
+        mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(0, -0.3, 0);
+
+        group.add(mesh);
+        platformList.push(mesh);
+
+        // Creates several starting platforms
+        var x = 0;
+        for (x = 0; x < 6; x++)
+        {
+            createPlatformRow();
+
+        }
+
+        // Initializes texture loader and loads player texture
+        var textureLoader = new THREE.TextureLoader();
+        var playerTexture = textureLoader.load( "textures/DoodleJump.png" );
+        var playerMaterial = new THREE.SpriteMaterial( {
+            map: playerTexture,
+            color: 0xffffff,
+            fog: true
+        } );
+
+        // Creates player object w collision and adds it into the scene
+        var playerSprite = new THREE.Sprite(playerMaterial);
+        var playerCollisionCube = new THREE.BoxGeometry(0.3,0.3,0.3);
+        var wireMaterial = new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe:true} );
+        var playerCollision = new THREE.Mesh( playerCollisionCube, wireMaterial );
+
+        playerSprite.position.set( 0, 0.2, 0 );
+        playerSprite.rotation.set(5, 0, 0);
+        playerSprite.scale.set(0.3, 0.3, 0.3);
+
+        scene.add(playerSprite);
+        scene.add(playerCollision);
+
+        scene.add(group);
+
+        // Adds skybox
+        var skyboxes = ['textures/skyboxes/mp_ss/', 'textures/skyboxes/mp_plains/'];
+        var randomPick = Math.floor(Math.random() * (skyboxes.length));
+        scene.background = new THREE.CubeTextureLoader()
+            .setPath( skyboxes[randomPick] )
+            .load( [ 'rt.jpg', 'lf.jpg', 'up.jpg', 'dn.jpg', 'bk.jpg', 'ft.jpg' ] );
+
+        init();
+        animate();
+
+        function init() {
+
+            camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 0.01, 10 );
+            camera.position.z = 2;
+
+            document.addEventListener( 'keydown', onKeyDown, false );
+            document.addEventListener( 'keyup', onKeyUp, false );
+            window.addEventListener( 'resize', onWindowResize, false );
+
+            renderer = new THREE.WebGLRenderer( { antialias: true } );
+            renderer.setSize( window.innerWidth, window.innerHeight );
+            document.body.appendChild( renderer.domElement );
+
+            //Dat Gui for debug
+            var debug = {
+                cameraX: 0,
+                addPlatform: function(){
+                    createPlatformRow();
+                    x++;
+                }
+            };
+            var gui = new dat.GUI();
+            var cameraZController = gui.add(debug, 'cameraX', -5, 5);
+            gui.add(debug, 'addPlatform');
+            cameraZController.onChange(function(value) {
+                // Fires on every change, drag, keypress, etc.
+                camera.rotation.set(value , camera.rotation.y , camera.rotation.z);
+            });
+
+
+
+        }
+
+        function animate() {
+            time = clock.getElapsedTime();
+            delta = clock.getDelta();
+
+            requestAnimationFrame( animate );
+
+            if (player.left == true)
+            {
+                if (player.xvelo > -0.035)
+                {
+                    player.xvelo -= 0.0025;
+                }
+            }
+
+            if (player.right == true)
+            {
+                if (player.xvelo < 0.035)
+                {
+                    player.xvelo += 0.0025;
+                }
+
+            }
+
+            // Decay acceleration
+            player.xvelo *= 0.95;
+            player.yvelo -= 0.002;
+
+            // Set highest Y
+            if (playerSprite.position.y > highestY)
+            {
+                highestY = playerSprite.position.y;
+                document.getElementById("score").innerHTML = Math.floor((highestY * 100) - 20);
+                camera.position.y = highestY - 0.2;
+            }
+
+            // Detecting Collision
+            var originPoint = playerCollision.position.clone();
+
+            for (var vertexIndex = 0; vertexIndex < playerCollision.geometry.vertices.length; vertexIndex++)
+            {
+                var localVertex = playerCollision.geometry.vertices[vertexIndex].clone();
+                var globalVertex = localVertex.applyMatrix4( playerCollision.matrix );
+                var directionVector = globalVertex.sub( playerCollision.position );
+
+                if (player.yvelo <= 0)
+                {
+                    var ray = new THREE.Raycaster(originPoint, directionVector.clone().normalize());
+                    var collisionResults = ray.intersectObjects(platformList);
+                    if (collisionResults.length > 0 && collisionResults[0].distance < directionVector.length()) {
+                        console.log(" Hit ");
+                        player.yvelo = 0.055;
+                    }
+                }
+            }
+
+            // Update player position
+            playerSprite.position.set(playerSprite.position.x + player.xvelo, playerSprite.position.y + player.yvelo, playerSprite.position.z);
+            playerCollision.position.set(playerSprite.position.x, playerSprite.position.y, playerSprite.position.z);
+            renderer.render( scene, camera );
+
+            // Bounces off like a wall
+            if (playerSprite.position.x < -1.5 || playerSprite.position.x > 1.5)
+            {
+                player.xvelo *= -1.2;
+            }
+
+            // Slight camera rotation
+            camera.rotation.set(camera.rotation.x, playerSprite.position.x / -5, camera.rotation.z);
+
+//            // Check if any elements are offscreen
+//            camera.updateMatrix();
+//            camera.updateMatrixWorld();
+//            var frustum = new THREE.Frustum();
+//            frustum.setFromMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+//
+//            // Your 3d point to check
+//            for (x = 0; x < scene.length; x++) {
+//                var pos = scene[x];
+//                if (frustum.containsPoint(pos)) {
+//                    console.log(scene[x]);
+//                    scene.remove(scene[x]);
+//                    scene[x].geometry.dispose();
+//                    scene[x].material.dispose();
+//                }
+//            }
+
+        }
+
+        function createPlatformRow()
+        {
+            var randomColor = Math.random() * 0xffffff;
+            var lmaterial = new THREE.LineBasicMaterial({
+                color: randomColor
+            });
+
+            var lgeometry = new THREE.Geometry();
+            lgeometry.vertices.push(
+                new THREE.Vector3( -1.5, x * 0.5, 0 ),
+                new THREE.Vector3( 1.5, x * 0.5, 0 )
+            );
+
+            var line = new THREE.Line( lgeometry, lmaterial );
+            scene.add( line );
+
+            for (y = 0; y < Math.random() * (4 - (1)) + 1; y++)
+            {
+                geometry = new THREE.BoxGeometry(0.35, 0.05, 0.1);
+                material = new THREE.MeshBasicMaterial({color: randomColor});
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(Math.random() * (1.5 - (-1.5)) + -1.5, x * (Math.random() * (0.55 - 0.51) + 0.51), 0);
+                group.add(mesh);
+                platformList.push(mesh);
+
+            }
+        }
+
+        // Handles window resizing
+        function onWindowResize()
+        {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize( window.innerWidth, window.innerHeight );
+        }
+
+        // Handles key down
+        function onKeyDown ( event )
+        {
+            switch( event.keyCode ) {
+                case 87: /*W*/ 	/*Shoot*/ player.yvelo = 0.05; break;
+                case 65: /*A*/   player.left = true; break;
+                case 68: /*D*/    player.right = true; break;
+                case 32: /*Space*/   /*Shoot*/ break;
+            }
+        }
+
+        // Handles key up
+        function onKeyUp ( event )
+        {
+            switch( event.keyCode ) {
+                case 65: /*A*/ 	 player.left = false; break;
+                case 68: /*D*/ 	  player.right = false; break;
+            }
+        }
+    </script>
+</body>
+</html>
