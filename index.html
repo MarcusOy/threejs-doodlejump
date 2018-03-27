@@ -115,7 +115,7 @@
 
         function init() {
 
-            camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 0.01, 10 );
+            camera = new THREE.PerspectiveCamera( 70000 / window.innerWidth, window.innerWidth / window.innerHeight, 0.01, 10 );
             camera.position.z = 2;
 
             document.addEventListener( 'keydown', onKeyDown, false );
@@ -169,6 +169,14 @@
                     player.xvelo += 0.0025;
                 }
 
+            }
+
+            if (player.xvelo < 0)
+            {
+                playerSprite.scale.set(-0.3, 0.3, 0.3);
+            } else
+            {
+                playerSprite.scale.set(0.3, 0.3, 0.3);
             }
 
             // Decay acceleration
@@ -236,6 +244,7 @@
 
         }
 
+        // Creates a row of platforms, each platform has the same random color
         function createPlatformRow()
         {
             var randomColor = Math.random() * 0xffffff;
@@ -264,6 +273,7 @@
             }
         }
 
+        // Allows accelerometer to work
         function handleOrientation(event) {
             absolute = event.absolute;
             alpha    = event.alpha;
@@ -271,7 +281,7 @@
             gamma    = event.gamma;
 
             // Do stuff with the new orientation data
-            var percentage = gamma / 90;
+            var percentage = gamma / 65;
             player.xvelo += percentage * 0.0025;
         }
 
@@ -280,6 +290,7 @@
         {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
+            camera.fov = 70000 / window.innerWidth;
 
             renderer.setSize( window.innerWidth, window.innerHeight );
         }
