@@ -23,7 +23,7 @@
             padding: 5px;
         }
         a {
-            color: #0af;
+            color: #14ff00;
         }
     </style>
     <script src="https://threejs.org/build/three.min.js"></script>
@@ -73,7 +73,7 @@
 
         // Creates several starting platforms
         var x = 0;
-        for (x = 0; x < 6; x++)
+        for (x = 0; x < 100; x++)
         {
             createPlatformRow();
 
@@ -115,8 +115,14 @@
 
         function init() {
 
-            camera = new THREE.PerspectiveCamera( 70000 / window.innerWidth, window.innerWidth / window.innerHeight, 0.01, 10 );
+            camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.01, 10 );
             camera.position.z = 2;
+
+            if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+                camera.zoom = 0.6;
+            } else {
+                camera.zoom = 1;
+            }
 
             document.addEventListener( 'keydown', onKeyDown, false );
             document.addEventListener( 'keyup', onKeyUp, false );
@@ -133,14 +139,20 @@
                 addPlatform: function(){
                     createPlatformRow();
                     x++;
-                }
+                },
+                zoom: 1
             };
             var gui = new dat.GUI();
             var cameraZController = gui.add(debug, 'cameraX', -5, 5);
+            var cameraZoomController = gui.add(debug, 'zoom', -5, 5);
             gui.add(debug, 'addPlatform');
             cameraZController.onChange(function(value) {
                 // Fires on every change, drag, keypress, etc.
                 camera.rotation.set(value , camera.rotation.y , camera.rotation.z);
+            });
+            cameraZoomController.onChange(function(value){
+                camera.zoom = value;
+                onWindowResize();
             });
 
 
@@ -290,7 +302,6 @@
         {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
-            camera.fov = 70000 / window.innerWidth;
 
             renderer.setSize( window.innerWidth, window.innerHeight );
         }
