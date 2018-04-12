@@ -33,7 +33,8 @@
 
     <div id="info">
     <a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> doodle jump - made by marcus orciuch - sprites by ...
-    <br><br>a - left | d - right | space/w - shoot | accelerometer and tap for mobile
+    <!--<br><br>a - left | d - right | space/w - shoot | accelerometer and tap for mobile-->
+    <br><br>a- left | d - right | accelerometer for mobile
     <br><br> <span id="score">0</span></div>
 
     <script>
@@ -44,6 +45,8 @@
 
         // Game variables
         var highestY = 0;
+        var lowestY = -0.5;
+        var gameOver = false;
 
         // Needed to count delta time and time elapsed
         clock = new THREE.Clock();
@@ -73,10 +76,9 @@
 
         // Creates several starting platforms
         var x = 0;
-        for (x = 0; x < 100; x++)
+        for (x = 0; x < 5000; x++)
         {
             createPlatformRow();
-
         }
 
         // Initializes texture loader and loads player texture
@@ -91,7 +93,7 @@
         // Creates player object w collision and adds it into the scene
         var playerSprite = new THREE.Sprite(playerMaterial);
         var playerCollisionCube = new THREE.BoxGeometry(0.3,0.3,0.3);
-        var wireMaterial = new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe:true} );
+        var wireMaterial = new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe:true, transparent: true, opacity: 0} );
         var playerCollision = new THREE.Mesh( playerCollisionCube, wireMaterial );
 
         playerSprite.position.set( 0, 0.2, 0 );
@@ -115,25 +117,30 @@
 
         function init() {
 
+            // Creates a camera in order for the player to see the 3d world
             camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.01, 10 );
             camera.position.z = 2;
 
+            // Changes zoom size based on browser agent
             if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
                 camera.zoom = 0.6;
             } else {
                 camera.zoom = 1;
             }
 
+            // Binds browser actions to Javascript Functions
             document.addEventListener( 'keydown', onKeyDown, false );
             document.addEventListener( 'keyup', onKeyUp, false );
             window.addEventListener( 'resize', onWindowResize, false );
             window.addEventListener("deviceorientation", handleOrientation, true);
+            window.addEventListener('touchstart', handleTouch, true);
 
+            // Adds the renderer to the HTML
             renderer = new THREE.WebGLRenderer( { antialias: true } );
             renderer.setSize( window.innerWidth, window.innerHeight );
             document.body.appendChild( renderer.domElement );
 
-            //Dat Gui for debug
+            //Debug object
             var debug = {
                 cameraX: 0,
                 addPlatform: function(){
@@ -142,6 +149,8 @@
                 },
                 zoom: 1
             };
+            // Dat Gui visual debug tool
+            // Comment out for prod
             var gui = new dat.GUI();
             var cameraZController = gui.add(debug, 'cameraX', -5, 5);
             var cameraZoomController = gui.add(debug, 'zoom', -5, 5);
@@ -183,6 +192,7 @@
 
             }
 
+            // Flips the player sprite
             if (player.xvelo < 0)
             {
                 playerSprite.scale.set(-0.3, 0.3, 0.3);
@@ -195,30 +205,44 @@
             player.xvelo *= 0.95;
             player.yvelo -= 0.002;
 
+
+
             // Set highest Y
             if (playerSprite.position.y > highestY)
             {
                 highestY = playerSprite.position.y;
+                lowestY = highestY - 1.95;
                 document.getElementById("score").innerHTML = Math.floor((highestY * 100) - 20);
                 camera.position.y = highestY - 0.2;
             }
 
+            // Game over if fall
+            if (gameOver == false) {
+                if (playerSprite.position.y <= lowestY) {
+                    document.getElementById("score").innerHTML += " | Game Over";
+                    document.getElementById("score").style.color = "red";
+                    gameOver = true;
+                }
+            }
+
             // Detecting Collision
+            // Grabbed from https://stemkoski.github.io/Three.js/index.html
+            // Heavily modified in order to work for me
             var originPoint = playerCollision.position.clone();
 
-            for (var vertexIndex = 0; vertexIndex < playerCollision.geometry.vertices.length; vertexIndex++)
-            {
-                var localVertex = playerCollision.geometry.vertices[vertexIndex].clone();
-                var globalVertex = localVertex.applyMatrix4( playerCollision.matrix );
-                var directionVector = globalVertex.sub( playerCollision.position );
+            if (gameOver != true) {
+                for (var vertexIndex = 0; vertexIndex < playerCollision.geometry.vertices.length; vertexIndex++) {
+                    var localVertex = playerCollision.geometry.vertices[vertexIndex].clone();
+                    var globalVertex = localVertex.applyMatrix4(playerCollision.matrix);
+                    var directionVector = globalVertex.sub(playerCollision.position);
 
-                if (player.yvelo <= 0)
-                {
-                    var ray = new THREE.Raycaster(originPoint, directionVector.clone().normalize());
-                    var collisionResults = ray.intersectObjects(platformList);
-                    if (collisionResults.length > 0 && collisionResults[0].distance < directionVector.length()) {
-                        console.log(" Hit ");
-                        player.yvelo = 0.055;
+                    if (player.yvelo <= 0) {
+                        var ray = new THREE.Raycaster(originPoint, directionVector.clone().normalize());
+                        var collisionResults = ray.intersectObjects(platformList);
+                        if (collisionResults.length > 0 && collisionResults[0].distance < directionVector.length()) {
+                            console.log(" Hit ");
+                            player.yvelo = 0.055;
+                        }
                     }
                 }
             }
@@ -237,6 +261,7 @@
             // Slight camera rotation
             camera.rotation.set(camera.rotation.x, playerSprite.position.x / -5, camera.rotation.z);
 
+            // Not used: grabbed from Stackoverflow but will implement later
 //            // Check if any elements are offscreen
 //            camera.updateMatrix();
 //            camera.updateMatrixWorld();
@@ -285,6 +310,16 @@
             }
         }
 
+        function handleTouch(event)
+        {
+            shoot();
+        }
+
+        function shoot()
+        {
+
+        }
+
         // Allows accelerometer to work
         function handleOrientation(event) {
             absolute = event.absolute;
@@ -310,10 +345,10 @@
         function onKeyDown ( event )
         {
             switch( event.keyCode ) {
-                case 87: /*W*/ 	/*Shoot*/ player.yvelo = 0.05; break;
+                case 87: /*W*/ 	/*Shoot*/  break;
                 case 65: /*A*/   player.left = true; break;
                 case 68: /*D*/    player.right = true; break;
-                case 32: /*Space*/   /*Shoot*/ break;
+                case 32: /*Space*/   shoot(); break;
             }
         }
 
